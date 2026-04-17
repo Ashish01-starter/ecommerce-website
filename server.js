@@ -7,7 +7,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const ALLOWED_TABLES = ['BUYER', 'EMPLOYEE', 'MANAGES', 'PRODUCT', 'PURCHASES', 'SELLER', 'TRANSACTION'];
+const ALLOWED_TABLES = ['BUYER', 'EMPLOYEE', 'MANAGES', 'PRODUCT', 'PURCHASES', 'SELLER', 'TRANSACTIONS'];
 
 /* =========================
    GET TABLE SCHEMA (FIXED)
