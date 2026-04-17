@@ -7,34 +7,51 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+/* =========================
+   TABLE MAP (🔥 FIX)
+========================= */
+const TABLE_MAP = {
+    TRANSACTION: 'TRANSACTIONS'
+};
+
+function getRealTable(table) {
+    return TABLE_MAP[table] || table;
+}
+
+/* =========================
+   ALLOWED TABLES
+========================= */
 const ALLOWED_TABLES = [
     'BUYER', 'EMPLOYEE', 'MANAGES',
     'PRODUCT', 'PURCHASES', 'SELLER',
-    'TRANSACTIONS'
+    'TRANSACTION', 'TRANSACTIONS' // allow both
 ];
 
 /* =========================
-   PRIMARY KEY MAP (FOR UPDATE)
+   PRIMARY KEYS
 ========================= */
 const PRIMARY_KEYS = {
     BUYER: ['BuyerID'],
     EMPLOYEE: ['EmpID'],
     PRODUCT: ['ProductID'],
     SELLER: ['SellerID'],
+    TRANSACTION: ['TxnID'],
     TRANSACTIONS: ['TxnID'],
     PURCHASES: ['BuyerID', 'ProductID'],
     MANAGES: ['SellerID', 'EmpID']
 };
 
 /* =========================
-   GET TABLE SCHEMA
+   SCHEMA
 ========================= */
 app.get('/api/schema/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
+    let table = req.params.table.toUpperCase();
 
     if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
+
+    const realTable = getRealTable(table);
 
     const query = `
         SELECT COLUMN_NAME, DATA_TYPE
@@ -43,51 +60,26 @@ app.get('/api/schema/:table', (req, res) => {
         AND TABLE_NAME = ?
     `;
 
-    db.query(query, [table], (err, result) => {
-        if (err) {
-            console.error("Schema Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
+    db.query(query, [realTable], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
         res.json(result);
     });
 });
 
 /* =========================
-   GET ALL RECORDS
+   GET DATA
 ========================= */
 app.get('/api/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
+    let table = req.params.table.toUpperCase();
 
     if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    db.query(`SELECT * FROM \`${table}\``, (err, result) => {
-        if (err) {
-            console.error("Fetch Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
-});
+    const realTable = getRealTable(table);
 
-/* =========================
-   LOOKUP (FOREIGN KEYS)
-========================= */
-app.get('/api/lookup/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
-
-    if (!PRIMARY_KEYS[table]) {
-        return res.status(400).json({ error: 'Invalid table' });
-    }
-
-    const pk = PRIMARY_KEYS[table][0];
-
-    db.query(`SELECT ${pk} AS ID FROM \`${table}\``, (err, result) => {
-        if (err) {
-            console.error("Lookup Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
+    db.query(`SELECT * FROM \`${realTable}\``, (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
         res.json(result);
     });
 });
@@ -96,73 +88,23 @@ app.get('/api/lookup/:table', (req, res) => {
    INSERT
 ========================= */
 app.post('/api/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
+    let table = req.params.table.toUpperCase();
 
     if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
+    const realTable = getRealTable(table);
+
     const data = req.body;
-    const columns = Object.keys(data);
+    const cols = Object.keys(data);
     const values = Object.values(data);
 
-    const placeholders = columns.map(() => '?').join(', ');
-
-    const query = `INSERT INTO \`${table}\` (${columns.join(', ')}) VALUES (${placeholders})`;
+    const query = `INSERT INTO \`${realTable}\` (${cols.join(', ')}) VALUES (${cols.map(()=>'?').join(', ')})`;
 
     db.query(query, values, (err, result) => {
-        if (err) {
-            console.error("Insert Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
-
-        res.json({
-            success: true,
-            rowsAffected: result.affectedRows
-        });
-    });
-});
-
-/* =========================
-   UPDATE (FIXED PROPERLY)
-========================= */
-app.put('/api/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
-
-    if (!ALLOWED_TABLES.includes(table)) {
-        return res.status(400).json({ error: 'Invalid table' });
-    }
-
-    const data = req.body;
-    const pkCols = PRIMARY_KEYS[table];
-
-    if (!pkCols) {
-        return res.status(400).json({ error: 'No primary key defined' });
-    }
-
-    // Split PK and non-PK fields
-    const updateCols = Object.keys(data).filter(col => !pkCols.includes(col));
-    const updateValues = updateCols.map(col => data[col]);
-
-    const whereClause = pkCols.map(col => `${col} = ?`).join(' AND ');
-    const whereValues = pkCols.map(col => data[col]);
-
-    const query = `
-        UPDATE \`${table}\`
-        SET ${updateCols.map(col => `${col} = ?`).join(', ')}
-        WHERE ${whereClause}
-    `;
-
-    db.query(query, [...updateValues, ...whereValues], (err, result) => {
-        if (err) {
-            console.error("Update Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
-
-        res.json({
-            success: true,
-            rowsAffected: result.affectedRows
-        });
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
     });
 });
 
@@ -170,39 +112,27 @@ app.put('/api/:table', (req, res) => {
    DELETE
 ========================= */
 app.delete('/api/:table', (req, res) => {
-    const table = req.params.table.toUpperCase();
+    let table = req.params.table.toUpperCase();
 
     if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const data = req.body;
+    const realTable = getRealTable(table);
+
     const pkCols = PRIMARY_KEYS[table];
+    const values = pkCols.map(col => req.body[col]);
 
-    if (!pkCols) {
-        return res.status(400).json({ error: 'No primary key defined' });
-    }
+    const query = `DELETE FROM \`${realTable}\` WHERE ${pkCols.map(c => `${c}=?`).join(' AND ')}`;
 
-    const whereClause = pkCols.map(col => `${col} = ?`).join(' AND ');
-    const values = pkCols.map(col => data[col]);
-
-    const query = `DELETE FROM \`${table}\` WHERE ${whereClause}`;
-
-    db.query(query, values, (err, result) => {
-        if (err) {
-            console.error("Delete Error:", err);
-            return res.status(500).json({ error: err.message });
-        }
-
-        res.json({
-            success: true,
-            rowsAffected: result.affectedRows
-        });
+    db.query(query, values, (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
     });
 });
 
 /* =========================
-   START SERVER
+   START
 ========================= */
 const PORT = process.env.PORT || 3000;
 
