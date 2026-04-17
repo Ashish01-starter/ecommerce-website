@@ -7,7 +7,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const ALLOWED_TABLES = ['BUYER', 'EMPLOYEE', 'MANAGES', 'PRODUCT', 'PURCHASES', 'SELLER', 'TRANSACTIONS'];
+const ALLOWED_TABLES = [
+    'BUYER', 'EMPLOYEE', 'MANAGES',
+    'PRODUCT', 'PURCHASES', 'SELLER',
+    'TRANSACTIONS'
+];
+
+// 🔥 MAP API → REAL TABLE
+const TABLE_MAP = {
+    TRANSACTIONS: 'TRANSACTION'
+};
+
+function getRealTable(table) {
+    return TABLE_MAP[table] || table;
+}
 
 /* =========================
    GET TABLE SCHEMA (FIXED)
@@ -19,17 +32,19 @@ app.get('/api/schema/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
+    const realTable = getRealTable(table);
+
     const query = `
         SELECT COLUMN_NAME, DATA_TYPE
         FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = 'ecommerce'
+        WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = ?
     `;
 
-    db.query(query, [table], (err, result) => {
+    db.query(query, [realTable], (err, result) => {
         if (err) {
             console.error("Schema Error:", err);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: err.message, full: err });
         }
         res.json(result);
     });
@@ -45,19 +60,21 @@ app.get('/api/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const query = `SELECT * FROM ${table}`;
+    const realTable = getRealTable(table);
+
+    const query = `SELECT * FROM \`${realTable}\``;
 
     db.query(query, (err, result) => {
         if (err) {
             console.error("Fetch Error:", err);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: err.message, full: err });
         }
         res.json(result);
     });
 });
 
 /* =========================
-   LOOKUP (FOREIGN KEYS)
+   LOOKUP
 ========================= */
 app.get('/api/lookup/:parentTable', (req, res) => {
     const parentTable = req.params.parentTable.toUpperCase();
@@ -66,30 +83,32 @@ app.get('/api/lookup/:parentTable', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
+    const realTable = getRealTable(parentTable);
+
     let pkCol =
-        parentTable === 'TRANSACTION' ? 'TXNID' :
-        parentTable === 'PRODUCT' ? 'PRODUCTID' :
-        parentTable === 'BUYER' ? 'BUYERID' :
-        parentTable === 'SELLER' ? 'SELLERID' :
-        parentTable === 'EMPLOYEE' ? 'EMPID' : null;
+        realTable === 'TRANSACTION' ? 'TXNID' :
+        realTable === 'PRODUCT' ? 'PRODUCTID' :
+        realTable === 'BUYER' ? 'BUYERID' :
+        realTable === 'SELLER' ? 'SELLERID' :
+        realTable === 'EMPLOYEE' ? 'EMPID' : null;
 
     if (!pkCol) {
         return res.status(400).json({ error: 'Lookup not supported' });
     }
 
-    const query = `SELECT ${pkCol} AS ID FROM ${parentTable}`;
+    const query = `SELECT ${pkCol} AS ID FROM \`${realTable}\``;
 
     db.query(query, (err, result) => {
         if (err) {
             console.error("Lookup Error:", err);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: err.message, full: err });
         }
         res.json(result);
     });
 });
 
 /* =========================
-   INSERT RECORD
+   INSERT
 ========================= */
 app.post('/api/:table', (req, res) => {
     const table = req.params.table.toUpperCase();
@@ -98,18 +117,20 @@ app.post('/api/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
+    const realTable = getRealTable(table);
+
     const data = req.body;
     const columns = Object.keys(data);
     const values = Object.values(data);
 
     const placeholders = columns.map(() => '?').join(', ');
 
-    const query = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+    const query = `INSERT INTO \`${realTable}\` (${columns.join(', ')}) VALUES (${placeholders})`;
 
     db.query(query, values, (err, result) => {
         if (err) {
             console.error("Insert Error:", err);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: err.message, full: err });
         }
 
         res.json({
@@ -120,7 +141,7 @@ app.post('/api/:table', (req, res) => {
 });
 
 /* =========================
-   DELETE RECORD
+   DELETE
 ========================= */
 app.delete('/api/:table', (req, res) => {
     const table = req.params.table.toUpperCase();
@@ -128,6 +149,8 @@ app.delete('/api/:table', (req, res) => {
     if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
+
+    const realTable = getRealTable(table);
 
     const keys = req.body;
 
@@ -143,12 +166,12 @@ app.delete('/api/:table', (req, res) => {
         values.push(val);
     }
 
-    const query = `DELETE FROM ${table} WHERE ${conditions.join(' AND ')}`;
+    const query = `DELETE FROM \`${realTable}\` WHERE ${conditions.join(' AND ')}`;
 
     db.query(query, values, (err, result) => {
         if (err) {
             console.error("Delete Error:", err);
-            return res.status(500).json({ error: err.message });
+            return res.status(500).json({ error: err.message, full: err });
         }
 
         res.json({
