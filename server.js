@@ -13,17 +13,15 @@ const ALLOWED_TABLES = [
     'TRANSACTIONS'
 ];
 
-// 🔥 MAP API → REAL TABLE
-const TABLE_MAP = {
-    TRANSACTIONS: 'TRANSACTION'
-};
-
+/* =========================
+   HELPER (NO MAPPING NOW)
+========================= */
 function getRealTable(table) {
-    return TABLE_MAP[table] || table;
+    return table; // ✅ DB and API names now match
 }
 
 /* =========================
-   GET TABLE SCHEMA (FIXED)
+   GET TABLE SCHEMA
 ========================= */
 app.get('/api/schema/:table', (req, res) => {
     const table = req.params.table.toUpperCase();
@@ -32,8 +30,6 @@ app.get('/api/schema/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const realTable = getRealTable(table);
-
     const query = `
         SELECT COLUMN_NAME, DATA_TYPE
         FROM INFORMATION_SCHEMA.COLUMNS
@@ -41,7 +37,7 @@ app.get('/api/schema/:table', (req, res) => {
         AND TABLE_NAME = ?
     `;
 
-    db.query(query, [realTable], (err, result) => {
+    db.query(query, [table], (err, result) => {
         if (err) {
             console.error("Schema Error:", err);
             return res.status(500).json({ error: err.message, full: err });
@@ -60,9 +56,7 @@ app.get('/api/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const realTable = getRealTable(table);
-
-    const query = `SELECT * FROM \`${realTable}\``;
+    const query = `SELECT * FROM \`${table}\``;
 
     db.query(query, (err, result) => {
         if (err) {
@@ -77,26 +71,24 @@ app.get('/api/:table', (req, res) => {
    LOOKUP
 ========================= */
 app.get('/api/lookup/:parentTable', (req, res) => {
-    const parentTable = req.params.parentTable.toUpperCase();
+    const table = req.params.parentTable.toUpperCase();
 
-    if (!ALLOWED_TABLES.includes(parentTable)) {
+    if (!ALLOWED_TABLES.includes(table)) {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const realTable = getRealTable(parentTable);
-
     let pkCol =
-        realTable === 'TRANSACTION' ? 'TXNID' :
-        realTable === 'PRODUCT' ? 'PRODUCTID' :
-        realTable === 'BUYER' ? 'BUYERID' :
-        realTable === 'SELLER' ? 'SELLERID' :
-        realTable === 'EMPLOYEE' ? 'EMPID' : null;
+        table === 'TRANSACTIONS' ? 'TXNID' :
+        table === 'PRODUCT' ? 'PRODUCTID' :
+        table === 'BUYER' ? 'BUYERID' :
+        table === 'SELLER' ? 'SELLERID' :
+        table === 'EMPLOYEE' ? 'EMPID' : null;
 
     if (!pkCol) {
         return res.status(400).json({ error: 'Lookup not supported' });
     }
 
-    const query = `SELECT ${pkCol} AS ID FROM \`${realTable}\``;
+    const query = `SELECT ${pkCol} AS ID FROM \`${table}\``;
 
     db.query(query, (err, result) => {
         if (err) {
@@ -117,15 +109,13 @@ app.post('/api/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const realTable = getRealTable(table);
-
     const data = req.body;
     const columns = Object.keys(data);
     const values = Object.values(data);
 
     const placeholders = columns.map(() => '?').join(', ');
 
-    const query = `INSERT INTO \`${realTable}\` (${columns.join(', ')}) VALUES (${placeholders})`;
+    const query = `INSERT INTO \`${table}\` (${columns.join(', ')}) VALUES (${placeholders})`;
 
     db.query(query, values, (err, result) => {
         if (err) {
@@ -150,8 +140,6 @@ app.delete('/api/:table', (req, res) => {
         return res.status(400).json({ error: 'Invalid table' });
     }
 
-    const realTable = getRealTable(table);
-
     const keys = req.body;
 
     if (!keys || Object.keys(keys).length === 0) {
@@ -166,7 +154,7 @@ app.delete('/api/:table', (req, res) => {
         values.push(val);
     }
 
-    const query = `DELETE FROM \`${realTable}\` WHERE ${conditions.join(' AND ')}`;
+    const query = `DELETE FROM \`${table}\` WHERE ${conditions.join(' AND ')}`;
 
     db.query(query, values, (err, result) => {
         if (err) {
