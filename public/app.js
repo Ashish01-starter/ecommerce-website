@@ -1,4 +1,4 @@
-const tableList = document.getElementById('tableList');
+const tableList = document.getElementById('table-list'); // ✅ FIXED ID
 const tableTitle = document.getElementById('tableTitle');
 const tableHead = document.getElementById('tableHead');
 const tableBody = document.getElementById('tableBody');
@@ -15,11 +15,13 @@ let currentSchema = [];
 let editMode = false;
 
 /* =========================
-   LOAD TABLE
+   LOAD TABLE (FIXED)
 ========================= */
 tableList.addEventListener('click', async e => {
-    if (e.target.tagName === 'LI') {
-        const table = e.target.dataset.table;
+    const btn = e.target.closest('button'); // ✅ FIXED CLICK
+
+    if (btn && btn.dataset.table) {
+        const table = btn.dataset.table;
         loadTableData(table);
     }
 });
@@ -53,7 +55,6 @@ function renderTable(data) {
 
     const columns = Object.keys(data[0]);
 
-    // header
     const trHead = document.createElement('tr');
     columns.forEach(col => {
         const th = document.createElement('th');
@@ -67,7 +68,6 @@ function renderTable(data) {
 
     tableHead.appendChild(trHead);
 
-    // rows
     data.forEach(row => {
         const tr = document.createElement('tr');
 
@@ -77,16 +77,13 @@ function renderTable(data) {
             tr.appendChild(td);
         });
 
-        // ACTION BUTTONS
         const actionsTd = document.createElement('td');
 
-        // EDIT
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Edit';
         editBtn.className = 'btn';
         editBtn.onclick = () => openEditModal(row);
 
-        // DELETE
         const delBtn = document.createElement('button');
         delBtn.textContent = 'Delete';
         delBtn.className = 'btn btn-danger';
@@ -165,7 +162,6 @@ function openEditModal(rowData) {
     modalTitle.textContent = 'Edit Record';
 
     buildForm().then(() => {
-        // Fill form
         currentSchema.forEach(col => {
             const input = document.querySelector(`[name="${col.COLUMN_NAME}"]`);
             if (input) {
