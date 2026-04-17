@@ -1,4 +1,4 @@
-# ecommerce-website
+# Full Stack E-Commerce Database System
 ## 🚀 Live Demo
 🌐 Frontend:
 https://ecommerce-website-2xfh.onrender.com
