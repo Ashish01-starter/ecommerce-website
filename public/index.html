@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle DB Interface</title>
+    <meta name="description" content="A premium database management interface for your Oracle setup.">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Ionicons for beautiful icons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <ion-icon name="server-outline"></ion-icon>
+                </div>
+                <h2>DB Explorer</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <h3>Tables</h3>
+                <ul id="table-list">
+                    <li><button data-table="BUYER"><ion-icon name="person-outline"></ion-icon> BUYER</button></li>
+                    <li><button data-table="EMPLOYEE"><ion-icon name="briefcase-outline"></ion-icon> EMPLOYEE</button></li>
+                    <li><button data-table="MANAGES"><ion-icon name="git-network-outline"></ion-icon> MANAGES</button></li>
+                    <li><button data-table="PRODUCT"><ion-icon name="cube-outline"></ion-icon> PRODUCT</button></li>
+                    <li><button data-table="PURCHASES"><ion-icon name="cart-outline"></ion-icon> PURCHASES</button></li>
+                    <li><button data-table="SELLER"><ion-icon name="storefront-outline"></ion-icon> SELLER</button></li>
+                    <li><button data-table="TRANSACTION"><ion-icon name="card-outline"></ion-icon> TRANSACTION</button></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar glass-panel">
+                <h1 id="current-table-title">Select a Table</h1>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <ion-icon name="search-outline"></ion-icon>
+                        <input type="text" id="search-input" placeholder="Filter rows...">
+                    </div>
+                    <button id="add-record-btn" class="btn btn-primary" style="display: none;">
+                        <ion-icon name="add-outline"></ion-icon> Add Record
+                    </button>
+                </div>
+            </header>
+
+            <div class="data-container glass-panel">
+                <div id="loading" class="loader" style="display: none;"></div>
+                <div class="table-wrapper">
+                    <table id="data-table">
+                        <thead id="table-head">
+                            <!-- Dynamically populated -->
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Dynamically populated -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="no-data" class="empty-state" style="display: flex;">
+                    <ion-icon name="file-tray-outline"></ion-icon>
+                    <p>No data selected or available</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Record Modal (Glassmorphism) -->
+    <div id="add-modal" class="modal-overlay">
+        <div class="modal glass-panel">
+            <div class="modal-header">
+                <h3 id="modal-title">Add Record</h3>
+                <button class="close-btn" id="close-modal"><ion-icon name="close-outline"></ion-icon></button>
+            </div>
+            <div class="modal-body">
+                <form id="add-form">
+                    <!-- Dynamic Form fields go here -->
+                    <div id="form-fields"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Record</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
