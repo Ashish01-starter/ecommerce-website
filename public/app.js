@@ -1,195 +1,136 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const tableButtons = document.querySelectorAll('#table-list button');
-    const tableHead = document.getElementById('table-head');
-    const tableBody = document.getElementById('table-body');
-    const emptyState = document.getElementById('no-data');
-    const loader = document.getElementById('loading');
-    const searchInput = document.getElementById('search-input');
-    const addRecordBtn = document.getElementById('add-record-btn');
-    const currentTableTitle = document.getElementById('current-table-title');
+const tableList = document.getElementById('tableList');
+const tableTitle = document.getElementById('tableTitle');
+const tableHead = document.getElementById('tableHead');
+const tableBody = document.getElementById('tableBody');
+const addRecordBtn = document.getElementById('addRecordBtn');
 
-    const modalOverlay = document.getElementById('add-modal');
-    const closeModalBtn = document.getElementById('close-modal');
-    const addForm = document.getElementById('add-form');
-    const formFieldsContainer = document.getElementById('form-fields');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const formFields = document.getElementById('formFields');
+const addForm = document.getElementById('addForm');
+const cancelBtn = document.getElementById('cancelBtn');
 
-    let currentTable = '';
-    let currentSchema = [];
-    let currentData = [];
+let currentTable = null;
+let currentSchema = [];
+let editMode = false;
 
-    // Table selection
-    tableButtons.forEach(btn => {
-        btn.addEventListener('click', async () => {
-            tableButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+/* =========================
+   LOAD TABLE
+========================= */
+tableList.addEventListener('click', async e => {
+    if (e.target.tagName === 'LI') {
+        const table = e.target.dataset.table;
+        loadTableData(table);
+    }
+});
 
-            currentTable = btn.getAttribute('data-table');
-            currentTableTitle.textContent = currentTable;
-            addRecordBtn.style.display = 'inline-flex';
-            searchInput.value = '';
+async function loadTableData(table) {
+    currentTable = table;
+    tableTitle.textContent = table;
 
-            await loadTableData(currentTable);
-        });
-    });
+    const res = await fetch(`/api/${table}`);
+    const data = await res.json();
 
-    // Load data
-    async function loadTableData(tableName) {
-        showLoader();
-        try {
-            // ✅ Fetch schema safely
-            const schemaRes = await fetch(`/api/schema/${tableName}`);
-            if (!schemaRes.ok) throw new Error('Schema fetch failed');
-
-            const schemaData = await schemaRes.json();
-
-            // Normalize schema (MySQL safe)
-            currentSchema = schemaData.map(col => ({
-                COLUMN_NAME: col.COLUMN_NAME || col.column_name,
-                DATA_TYPE: (col.DATA_TYPE || col.data_type || '').toUpperCase()
-            }));
-
-            // ✅ Fetch data
-            const dataRes = await fetch(`/api/${tableName}`);
-            if (!dataRes.ok) throw new Error('Data fetch failed');
-
-            currentData = await dataRes.json();
-
-            renderTable(currentData);
-
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Backend not responding or schema issue.');
-        } finally {
-            hideLoader();
-        }
+    if (data.error) {
+        alert(data.error);
+        return;
     }
 
-    function renderTable(data) {
-        tableHead.innerHTML = '';
-        tableBody.innerHTML = '';
+    renderTable(data);
+}
 
-        if (!currentSchema.length) {
-            emptyState.style.display = 'flex';
-            return;
-        }
+/* =========================
+   RENDER TABLE
+========================= */
+function renderTable(data) {
+    tableHead.innerHTML = '';
+    tableBody.innerHTML = '';
 
-        emptyState.style.display = data.length ? 'none' : 'flex';
-
-        // Headers
-        const headerRow = document.createElement('tr');
-        currentSchema.forEach(col => {
-            const th = document.createElement('th');
-            th.textContent = col.COLUMN_NAME;
-            headerRow.appendChild(th);
-        });
-
-        const actionsTh = document.createElement('th');
-        actionsTh.textContent = 'Actions';
-        headerRow.appendChild(actionsTh);
-
-        tableHead.appendChild(headerRow);
-
-        // Rows
-        data.forEach(row => {
-            const tr = document.createElement('tr');
-
-            currentSchema.forEach(col => {
-                const td = document.createElement('td');
-                let value = row[col.COLUMN_NAME];
-
-                // Handle lowercase fallback
-                if (value === undefined) {
-                    value = row[col.COLUMN_NAME.toLowerCase()];
-                }
-
-                // Format dates
-                if (col.DATA_TYPE.includes('DATE') && value) {
-                    value = new Date(value).toLocaleDateString();
-                }
-
-                td.textContent = value ?? '';
-                tr.appendChild(td);
-            });
-
-            // Delete button
-            const actionsTd = document.createElement('td');
-            const delBtn = document.createElement('button');
-            delBtn.className = 'btn btn-danger';
-            delBtn.textContent = 'Delete';
-
-            delBtn.onclick = () => handleDelete(row);
-
-            actionsTd.appendChild(delBtn);
-            tr.appendChild(actionsTd);
-
-            tableBody.appendChild(tr);
-        });
+    if (!data.length) {
+        tableBody.innerHTML = `<tr><td colspan="100%">No data available</td></tr>`;
+        return;
     }
 
-    async function handleDelete(rowData) {
-        if (!confirm('Delete this record?')) return;
+    const columns = Object.keys(data[0]);
 
-        let pkColumns = {
-            PURCHASES: ['BUYERID', 'PRODUCTID'],
-            MANAGES: ['SELLERID', 'EMPID'],
-            TRANSACTION: ['TXNID'],
-            PRODUCT: ['PRODUCTID'],
-            SELLER: ['SELLERID'],
-            BUYER: ['BUYERID'],
-            EMPLOYEE: ['EMPID']
-        }[currentTable] || [];
+    // header
+    const trHead = document.createElement('tr');
+    columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        trHead.appendChild(th);
+    });
 
-        const payload = {};
-        pkColumns.forEach(col => {
-            payload[col] = rowData[col] ?? rowData[col.toLowerCase()];
+    const actionTh = document.createElement('th');
+    actionTh.textContent = 'Actions';
+    trHead.appendChild(actionTh);
+
+    tableHead.appendChild(trHead);
+
+    // rows
+    data.forEach(row => {
+        const tr = document.createElement('tr');
+
+        columns.forEach(col => {
+            const td = document.createElement('td');
+            td.textContent = row[col];
+            tr.appendChild(td);
         });
 
-        try {
-            const res = await fetch(`/api/${currentTable}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        // ACTION BUTTONS
+        const actionsTd = document.createElement('td');
 
-            if (res.ok) {
-                await loadTableData(currentTable);
-            } else {
-                const err = await res.json();
-                alert(err.error || 'Delete failed');
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }
+        // EDIT
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'btn';
+        editBtn.onclick = () => openEditModal(row);
 
-    // Search
-    searchInput.addEventListener('input', e => {
-        const q = e.target.value.toLowerCase();
+        // DELETE
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.className = 'btn btn-danger';
+        delBtn.onclick = () => handleDelete(row);
 
-        if (!q) return renderTable(currentData);
+        actionsTd.appendChild(editBtn);
+        actionsTd.appendChild(delBtn);
+        tr.appendChild(actionsTd);
 
-        const filtered = currentData.filter(row =>
-            Object.values(row).some(val =>
-                String(val).toLowerCase().includes(q)
-            )
-        );
-
-        renderTable(filtered);
+        tableBody.appendChild(tr);
     });
+}
 
-    // Modal open/close
-    addRecordBtn.addEventListener('click', async () => {
-        await buildForm();
-        modalOverlay.classList.add('active');
+/* =========================
+   BUILD FORM
+========================= */
+async function buildForm() {
+    formFields.innerHTML = '';
+
+    const res = await fetch(`/api/schema/${currentTable}`);
+    const schema = await res.json();
+
+    currentSchema = schema;
+
+    schema.forEach(col => {
+        const input = document.createElement('input');
+        input.name = col.COLUMN_NAME;
+        input.placeholder = col.COLUMN_NAME;
+        input.required = true;
+        formFields.appendChild(input);
     });
+}
 
-    closeModalBtn.onclick = () => modalOverlay.classList.remove('active');
+/* =========================
+   ADD RECORD
+========================= */
+addRecordBtn.addEventListener('click', async () => {
+    editMode = false;
+    modalTitle.textContent = 'Add Record';
 
-    modalOverlay.onclick = e => {
-        if (e.target === modalOverlay) modalOverlay.classList.remove('active');
-    };
+    await buildForm();
+    modalOverlay.classList.add('active');
 
-    addForm.addEventListener('submit', async e => {
+    addForm.onsubmit = async e => {
         e.preventDefault();
 
         const formData = new FormData(addForm);
@@ -199,56 +140,108 @@ document.addEventListener('DOMContentLoaded', () => {
             data[col.COLUMN_NAME] = formData.get(col.COLUMN_NAME);
         });
 
-        try {
+        const res = await fetch(`/api/${currentTable}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            alert('Inserted successfully ✅');
+            modalOverlay.classList.remove('active');
+            loadTableData(currentTable);
+        } else {
+            const err = await res.json();
+            alert(err.error);
+        }
+    };
+});
+
+/* =========================
+   EDIT RECORD
+========================= */
+function openEditModal(rowData) {
+    editMode = true;
+    modalTitle.textContent = 'Edit Record';
+
+    buildForm().then(() => {
+        // Fill form
+        currentSchema.forEach(col => {
+            const input = document.querySelector(`[name="${col.COLUMN_NAME}"]`);
+            if (input) {
+                input.value = rowData[col.COLUMN_NAME] || '';
+            }
+        });
+
+        modalOverlay.classList.add('active');
+
+        addForm.onsubmit = async e => {
+            e.preventDefault();
+
+            const formData = new FormData(addForm);
+            const data = {};
+
+            currentSchema.forEach(col => {
+                data[col.COLUMN_NAME] = formData.get(col.COLUMN_NAME);
+            });
+
             const res = await fetch(`/api/${currentTable}`, {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
             if (res.ok) {
+                alert('Updated successfully ✏️');
                 modalOverlay.classList.remove('active');
-                await loadTableData(currentTable);
+                loadTableData(currentTable);
             } else {
                 const err = await res.json();
-                alert(err.error || 'Insert failed');
+                alert(err.error);
             }
-        } catch (err) {
-            console.error(err);
-        }
+        };
+    });
+}
+
+/* =========================
+   DELETE
+========================= */
+function handleDelete(row) {
+    if (!confirm('Delete this record?')) return;
+
+    let pkColumns = {
+        PURCHASES: ['BuyerID', 'ProductID'],
+        MANAGES: ['SellerID', 'EmpID'],
+        TRANSACTIONS: ['TxnID'],
+        PRODUCT: ['ProductID'],
+        SELLER: ['SellerID'],
+        BUYER: ['BuyerID'],
+        EMPLOYEE: ['EmpID']
+    }[currentTable];
+
+    const keys = {};
+    pkColumns.forEach(pk => {
+        keys[pk] = row[pk];
     });
 
-    async function buildForm() {
-        formFieldsContainer.innerHTML = '';
-
-        for (let col of currentSchema) {
-            const group = document.createElement('div');
-            const label = document.createElement('label');
-            label.textContent = col.COLUMN_NAME;
-
-            const input = document.createElement('input');
-            input.name = col.COLUMN_NAME;
-            input.required = true;
-
-            if (col.DATA_TYPE.includes('DATE')) {
-                input.type = 'date';
-            } else if (col.DATA_TYPE.includes('INT')) {
-                input.type = 'number';
-            } else {
-                input.type = 'text';
-            }
-
-            group.appendChild(label);
-            group.appendChild(input);
-            formFieldsContainer.appendChild(group);
+    fetch(`/api/${currentTable}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(keys)
+    }).then(async res => {
+        if (res.ok) {
+            alert('Deleted successfully ❌');
+            loadTableData(currentTable);
+        } else {
+            const err = await res.json();
+            alert(err.error);
         }
-    }
+    });
+}
 
-    function showLoader() {
-        loader.style.display = 'block';
-    }
-
-    function hideLoader() {
-        loader.style.display = 'none';
-    }
-});
+/* =========================
+   CLOSE MODAL
+========================= */
+cancelBtn.onclick = () => {
+    modalOverlay.classList.remove('active');
+};
