@@ -1,31 +1,34 @@
-const tableList = document.getElementById('tableList'); // ✅ FIX
-const tableTitle = document.getElementById('current-table-title'); // ✅ FIX
-const tableHead = document.getElementById('table-head'); // ✅ FIX
-const tableBody = document.getElementById('table-body'); // ✅ FIX
-const addRecordBtn = document.getElementById('add-record-btn'); // ✅ FIX
+document.addEventListener('DOMContentLoaded', () => {
 
-const modalOverlay = document.getElementById('add-modal'); // ✅ FIX
-const modalTitle = document.getElementById('modal-title'); // ✅ FIX
-const formFields = document.getElementById('form-fields'); // ✅ FIX
-const addForm = document.getElementById('add-form'); // ✅ FIX
-const cancelBtn = document.getElementById('close-modal'); // ✅ FIX
+const tableList = document.getElementById('table-list');
+const tableTitle = document.getElementById('current-table-title');
+const tableHead = document.getElementById('table-head');
+const tableBody = document.getElementById('table-body');
+const addRecordBtn = document.getElementById('add-record-btn');
+
+const modalOverlay = document.getElementById('add-modal');
+const modalTitle = document.getElementById('modal-title');
+const formFields = document.getElementById('form-fields');
+const addForm = document.getElementById('add-form');
+const cancelBtn = document.getElementById('close-modal');
 
 let currentTable = null;
 let currentSchema = [];
-let editMode = false;
 
 /* =========================
-   LOAD TABLE (FIXED)
+   CLICK HANDLER
 ========================= */
 tableList.addEventListener('click', async e => {
     const btn = e.target.closest('button');
 
     if (btn && btn.dataset.table) {
-        const table = btn.dataset.table;
-        loadTableData(table);
+        loadTableData(btn.dataset.table);
     }
 });
 
+/* =========================
+   LOAD DATA
+========================= */
 async function loadTableData(table) {
     currentTable = table;
     tableTitle.textContent = table;
@@ -38,7 +41,7 @@ async function loadTableData(table) {
         return;
     }
 
-    addRecordBtn.style.display = 'inline-block'; // ✅ show button
+    addRecordBtn.style.display = 'inline-block';
     renderTable(data);
 }
 
@@ -54,12 +57,12 @@ function renderTable(data) {
         return;
     }
 
-    const columns = Object.keys(data[0]);
+    const cols = Object.keys(data[0]);
 
     const trHead = document.createElement('tr');
-    columns.forEach(col => {
+    cols.forEach(c => {
         const th = document.createElement('th');
-        th.textContent = col;
+        th.textContent = c;
         trHead.appendChild(th);
     });
 
@@ -72,48 +75,49 @@ function renderTable(data) {
     data.forEach(row => {
         const tr = document.createElement('tr');
 
-        columns.forEach(col => {
+        cols.forEach(c => {
             const td = document.createElement('td');
-            td.textContent = row[col];
+            td.textContent = row[c];
             tr.appendChild(td);
         });
 
-        const actionsTd = document.createElement('td');
+        const td = document.createElement('td');
 
-        const editBtn = document.createElement('button');
-        editBtn.textContent = 'Edit';
-        editBtn.onclick = () => openEditModal(row);
+        const del = document.createElement('button');
+        del.textContent = 'Delete';
+        del.onclick = () => handleDelete(row);
 
-        const delBtn = document.createElement('button');
-        delBtn.textContent = 'Delete';
-        delBtn.onclick = () => handleDelete(row);
-
-        actionsTd.appendChild(editBtn);
-        actionsTd.appendChild(delBtn);
-        tr.appendChild(actionsTd);
+        td.appendChild(del);
+        tr.appendChild(td);
 
         tableBody.appendChild(tr);
     });
 }
 
 /* =========================
-   BUILD FORM
+   DELETE
 ========================= */
-async function buildForm() {
-    formFields.innerHTML = '';
+function handleDelete(row) {
+    if (!confirm('Delete?')) return;
 
-    const res = await fetch(`/api/schema/${currentTable}`);
-    const schema = await res.json();
+    let pk = {
+        PURCHASES: ['BuyerID','ProductID'],
+        MANAGES: ['SellerID','EmpID'],
+        TRANSACTION: ['TxnID'],
+        PRODUCT: ['ProductID'],
+        SELLER: ['SellerID'],
+        BUYER: ['BuyerID'],
+        EMPLOYEE: ['EmpID']
+    }[currentTable];
 
-    currentSchema = schema;
+    const keys = {};
+    pk.forEach(k => keys[k] = row[k]);
 
-    schema.forEach(col => {
-        const input = document.createElement('input');
-        input.name = col.COLUMN_NAME;
-        input.placeholder = col.COLUMN_NAME;
-        input.required = true;
-        formFields.appendChild(input);
-    });
+    fetch(`/api/${currentTable}`, {
+        method: 'DELETE',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(keys)
+    }).then(() => loadTableData(currentTable));
 }
 
 /* =========================
@@ -122,65 +126,39 @@ async function buildForm() {
 addRecordBtn.addEventListener('click', async () => {
     modalTitle.textContent = 'Add Record';
 
-    await buildForm();
+    const res = await fetch(`/api/schema/${currentTable}`);
+    const schema = await res.json();
+
+    currentSchema = schema;
+    formFields.innerHTML = '';
+
+    schema.forEach(col => {
+        const input = document.createElement('input');
+        input.name = col.COLUMN_NAME;
+        input.placeholder = col.COLUMN_NAME;
+        formFields.appendChild(input);
+    });
+
     modalOverlay.style.display = 'flex';
 
     addForm.onsubmit = async e => {
         e.preventDefault();
 
-        const formData = new FormData(addForm);
+        const fd = new FormData(addForm);
         const data = {};
 
-        currentSchema.forEach(col => {
-            data[col.COLUMN_NAME] = formData.get(col.COLUMN_NAME);
-        });
+        schema.forEach(c => data[c.COLUMN_NAME] = fd.get(c.COLUMN_NAME));
 
-        const res = await fetch(`/api/${currentTable}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        await fetch(`/api/${currentTable}`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
             body: JSON.stringify(data)
         });
 
-        if (res.ok) {
-            alert('Inserted successfully ✅');
-            modalOverlay.style.display = 'none';
-            loadTableData(currentTable);
-        } else {
-            const err = await res.json();
-            alert(err.error);
-        }
+        modalOverlay.style.display = 'none';
+        loadTableData(currentTable);
     };
 });
-
-/* =========================
-   DELETE
-========================= */
-function handleDelete(row) {
-    if (!confirm('Delete this record?')) return;
-
-    let pkColumns = {
-        PURCHASES: ['BuyerID', 'ProductID'],
-        MANAGES: ['SellerID', 'EmpID'],
-        TRANSACTIONS: ['TxnID'],
-        PRODUCT: ['ProductID'],
-        SELLER: ['SellerID'],
-        BUYER: ['BuyerID'],
-        EMPLOYEE: ['EmpID']
-    }[currentTable];
-
-    const keys = {};
-    pkColumns.forEach(pk => {
-        keys[pk] = row[pk];
-    });
-
-    fetch(`/api/${currentTable}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(keys)
-    }).then(() => {
-        loadTableData(currentTable);
-    });
-}
 
 /* =========================
    CLOSE MODAL
@@ -188,3 +166,5 @@ function handleDelete(row) {
 cancelBtn.onclick = () => {
     modalOverlay.style.display = 'none';
 };
+
+});
