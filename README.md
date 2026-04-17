@@ -1,2 +1,10 @@
 # ecommerce-website
+## 🚀 Live Demo
+
+🌐 Frontend:
+https://ecommerce-website-2xfh.onrender.com
+
+📡 API Example:
+https://ecommerce-website-2xfh.onrender.com/api/BUYER
+
 Developed a full-stack e-commerce web application integrated with a relational database to manage products, users, and transactions efficiently. The system supports core functionalities such as adding, updating, and deleting products, handling user data, and processing transaction records. Designed and implemented multiple database tables with proper relationships to ensure data consistency and integrity. Built both frontend and backend components, enabling seamless interaction between the user interface and the database. The project demonstrates practical understanding of database design, CRUD operations, and full-stack development.
